@@ -15,15 +15,15 @@ def handle_image_content(images_content):
 def handle_metadata(metadata_url):
     metadata_r=requests.get(metadata_url)
     metadata_soup=BeautifulSoup(metadata_r.content)
+    retVal=0
     try:
         smil_url=metadata_soup.findAll("playbacklinks")[0]
         player_url_list.append(smil_url.contents[1].text)
     except Exception as identifier:
         print("failed to request ",metadata_url," error ",identifier)
         player_url_list.append("bad url")
-        
-    
-    
+        retVal=-1
+    return retVal
 
 def handle_player_content(player_content):
     player_iframe=player_content[0].find("iframe")
@@ -38,17 +38,26 @@ def handle_player_content(player_content):
             for line in text:
                 if "metadataURL" in line:
                     metadata_url=re.search('\'(.*)\'',line)
-                    handle_metadata(metadata_url.group(1))
-                
+                    if 0 > handle_metadata(metadata_url.group(1)):
+                        return -1
+    return 0
+
 def handle_stationid_url(stationid_url):
-    r1=requests.get(stationid_url)
+    try:
+        r1=requests.get(stationid_url)
+    except Exception as e:
+        print ("failed to request station id ",stationid_url," e=",e)
+        return 
+    
     c1=r1.content
     soup=BeautifulSoup(c1,"html.parser")
     player_content=soup.find_all("div",{"class":"player_content"})
     image_content=soup.find_all("div",{"class":"player_info_group"})
-    
-    handle_player_content(player_content)
-    handle_image_content(image_content)
+    if len(player_content)==0 or 0 == len(image_content):
+        print("played to get content for ",stationid_url)
+        return
+    if 0 == handle_player_content(player_content):
+        handle_image_content(image_content)
 
 def main():
     ssl._create_default_https_context = ssl._create_unverified_context
